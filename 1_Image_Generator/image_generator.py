@@ -1,21 +1,10 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 # Trabalho 1 - Geração de imagens
 # SCC0251 - Image Processing (01/2021)
 # Fabiana Dalacqua Mendes - 9894536
 # Pedro Henrique Nieuwenhoff - 10377729
 import numpy as np
-import numpy.random as random
-np.set_printoptions(suppress=True)
+import random
 import math
-
-
-# In[ ]:
-
 
 def normalize(img,max_norm):
     """ 
@@ -30,16 +19,12 @@ def normalize(img,max_norm):
     """
     imin = np.min(img)
     imax = np.max(img)
-    img_norm = (img - imin)/(imax - imin) # normalizes between 0 and 1
-    return img_norm * (max_norm - 1)
-
-
-# In[ ]:
-
+    img_norm = (img - imin)/(imax - imin) # normalizing between 0 and 1
+    return img_norm * (max_norm - 1) # normalizing to new max based on power of 2
 
 def generate_image(C,F,Q,S):
     """
-    This function return a image synthesize based on math or random function.
+    This function return a image synthesized based on math or random function.
     
     Parameters
     ----------
@@ -52,10 +37,7 @@ def generate_image(C,F,Q,S):
     S : int
         The seed for functions based on random values
     """
-    # initializing array with zeros
-    img_sint = np.zeros((C,C), float)
-    
-    # 1-5 functions definitions
+    # defining 1-5 functions for image synthetise
     def function_1(x,y):
         return (x*y + 2*y)
 
@@ -65,11 +47,31 @@ def generate_image(C,F,Q,S):
     def function_3(x,y,Q):
         return abs(3 * (x/Q) - np.cbrt(y/Q))
 
-    def function_4():
-        return random.random()
+    def function_4(C,S):
+        img = np.zeros((C,C), dtype=float) # initializing array with zeros
+        random.seed(S) # setting seed for random function
+        
+        for y in range(C):
+            for x in range(C):
+                img[x,y] = random.random()
+                
+        return img
 
-    def function_5(x,dx,C):
-        return (x + dx) % C
+    def function_5(C,S):
+        img = np.zeros((C,C), dtype=float) # initializing array with zeros
+        random.seed(S) # setting seed for random function
+        
+        x, y = 0, 0
+        steps = 1 + C*C
+
+        for i in range(steps): # randomwalking the image grid
+            img[x,y] = 1
+            dx = random.randint(-1,1)
+            dy = random.randint(-1,1)
+            x = (x + dx) % C
+            y = (y + dy) % C
+            
+        return img
     
     # synthetizing image according to the choose function
     if F == 1:
@@ -79,35 +81,16 @@ def generate_image(C,F,Q,S):
     elif F == 3:
         img_sint = np.fromfunction(lambda x,y: function_3(x,y,Q), (C,C))
     elif F == 4:
-        random.seed(S)
-        for y in range(C):
-            for x in range(C):
-                img_sint[x,y] = function_4()
+        img_sint = function_4(C,S)
     elif F == 5:
-        random.seed(S)
-        x, y = 0, 0
-        img_sint[x,y] = 1
-        steps = 1 + C**2
-    
-        for i in range(steps):
-            dx = random.randint(-1,1)
-            dy = random.randint(-1,1)
-            x = function_5(x,dx,C)
-            y = function_5(y,dy,C)
-            img_sint[x,y] = 1
-            
-        plt.imshow(img_sint, cmap="gray")
+        img_sint = function_5(C,S)
     else:
         img_sint = None
     
-    # normalizing image to 2ˆ16
+    # normalizing image to [0, 2ˆ16 - 1]
     img_sint_norm = normalize(img_sint, 65536)
     
     return img_sint_norm
-
-
-# In[ ]:
-
 
 def digitalize(img,C,N,B):
     """
@@ -140,27 +123,25 @@ def digitalize(img,C,N,B):
         return img_samp
 
     def quantization(img,B):
-        img_norm = normalize(img,256).astype(np.uint8)
+        img_norm = normalize(img,256).astype(np.uint8) # normalizing to [0, 2ˆ8 - 1]
         
-        b = 8 - B
-        img_quant = (img_norm >> b) << b
+        b = 8 - B # bitwise shift
+        img_quant = (img_norm >> b) << b # shift right follow by shift left
+        
         return img_quant
     
-    # sampling image and digitalizing
+    # digitalizing image 
     img_samp = downsampling(img,C,N)
     img_dig = quantization(img_samp,B)
 
     return img_dig
-
-
-# In[ ]:
-
 
 def compare_to_reference(img,r):
     """
     This function compare a ganerated image to a reference through
     Square Root Error (SRE). 
     The higher the SRE, the greater the difference between the images.
+    SRE equals zero means the images are the same.
     Parameters
     ----------
     img : array
@@ -168,16 +149,12 @@ def compare_to_reference(img,r):
     r : string
         The reference image filename
     """
-    reference = np.load(r) # carrega a imagem de referência
+    reference = np.load(r) # loading image reference from file
     
     sre = np.sum(np.square(img-reference))
-    sre = math.sqrt(sre)
-    
-    return round(sre,4)
+    sre = math.sqrt(sre) # calculating square root error
 
-
-# In[ ]:
-
+    return round(sre,4) # rounding to 4 decimal places
 
 def image_generator():
     """
@@ -202,6 +179,7 @@ def image_generator():
     S : int
         The seed for functions based on random values
     """
+    # getting input parameters
     r = str(input().rstrip())
     C = int(input())
     F = int(input())
@@ -210,14 +188,9 @@ def image_generator():
     B = int(input())
     S = int(input())
 
-    image = generate_image(C,F,Q,S)
-    image = digitalize(image,C,N,B)
-    print(compare_to_reference(image, r))
-
-
-# In[ ]:
-
+    image = generate_image(C,F,Q,S) # generating image
+    image = digitalize(image,C,N,B) # digitalizing
+    print(compare_to_reference(image, r)) # print rse value for comparison
 
 if __name__ == "__main__":
     image_generator()
-
